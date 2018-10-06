@@ -35,7 +35,8 @@ ui <- dashboardPage(
   ),
   dashboardBody(
     fluidRow(
-      valueBoxOutput("ytdLessons")
+      valueBoxOutput("ytdLessons"),
+      valueBoxOutput("ytdProfit")
     ),
     fluidRow(
       column(width = 5,
@@ -78,6 +79,16 @@ server <- function(input, output) {
       subtitle = "YTD Lessons",
       icon = icon("area-chart"),
       color = "aqua"
+    )
+  })  
+  
+  output$ytdProfit <- renderValueBox({
+    
+    valueBox(
+      value = paste("$", formatC(lessons()*200, format="d", big.mark=",")),
+      subtitle = "YTD Profit",
+      icon = icon("usd"),
+      color = "green"
     )
   })  
   
