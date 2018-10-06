@@ -1,0 +1,41 @@
+---
+title: "Accessing government weather data in Canada"
+output: html_notebook
+---
+
+The weather data for any weather station in Canada can be accessed manually from http://climate.weather.gc.ca/historical_data/search_historic_data_e.html
+
+However, automation of the data download can same lots of time. Fortunately, appropriate API has already been built and it is highly recommended to use it. In R, we need to install the "rclimateca" package that can pull the data directly from the website:
+```{r}
+install.packages("rclimateca")
+```
+
+You should only run the above cell once. Comment it out after the package is installed (put "#" character before the install.packages() command).
+
+Once the package is installed, we load it in the regular way:
+```{r}
+library(rclimateca)
+```
+
+Once the package is loaded, we can look up information on various weather stations. For example, "LA MACAZA" station's descriptive info can be obtained as follows:
+```{r}
+ec_climate_locations_all[ec_climate_locations_all$name == "LA MACAZA",]
+```
+
+To query the data through API we need station's climate_id which, in this case, is 5599:
+```{r}
+la_macaza_station_id <- ec_climate_locations_all$station_id[ec_climate_locations_all$name == "LA MACAZA"]
+la_macaza_station_id
+```
+
+We also need starting and ending dates which we can set to the respective starting and ending dates in the provided sales data: 
+```{r}
+weather_data <- ec_climate_data(la_macaza_station_id, timeframe = "daily", start = "2013-12-02", end = "2018-02-28")
+```
+
+We can now save the data in the appropriate formats, for example, in the native R format and in CSV if you plan to open the data in Excel:
+```{r}
+save(weather_data, file = "weather_data.RData")
+write.csv(weather_data, file = "weather_data.csv", row.names = FALSE)
+```
+

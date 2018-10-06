@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head></head><body>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="container-fluid main-container">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="fluid-row">
+
+<div class="btn-group pull-right">
+<span>Code</span> <span class="caret"></span>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a rel="noopener" href="#">Show All Code</a></li>
+<li><a rel="noopener" href="#">Hide All Code</a></li>
+<li class="divider"></li>
+<li><a rel="noopener" href="#">Download Rmd</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Accessing government weather data in Canada</h1>
+
+</div>
+
+
+
+<p>The weather data for any weather station in Canada can be accessed manually from <a rel="noopener" href="http://climate.weather.gc.ca/historical_data/search_historic_data_e.html" class="uri">http://climate.weather.gc.ca/historical_data/search_historic_data_e.html</a></p>
+<p>However, automation of the data download can same lots of time. Fortunately, appropriate API has already been built and it is highly recommended to use it. In R, we need to install the “rclimateca” package that can pull the data directly from the website:</p>
+
+
+
+<pre class="r"><code>install.packages(&quot;rclimateca&quot;)</code></pre>
+
+
+
+<p>You should only run the above cell once. Comment it out after the package is installed (put “#” character before the install.packages() command).</p>
+<p>Once the package is installed, we load it in the regular way:</p>
+
+
+
+<pre class="r"><code>library(rclimateca)</code></pre>
+
+
+
+<p>Once the package is loaded, we can look up information on various weather stations. For example, “LA MACAZA” station’s descriptive info can be obtained as follows:</p>
+
+
+
+<pre class="r"><code>ec_climate_locations_all[ec_climate_locations_all$name == &quot;LA MACAZA&quot;,]</code></pre>
+
+
+<div>
+
+</div>
+
+
+
+<p>To query the data through API we need station’s climate_id which, in this case, is 5599:</p>
+
+
+
+<pre class="r"><code>la_macaza_station_id &lt;- ec_climate_locations_all$station_id[ec_climate_locations_all$name == &quot;LA MACAZA&quot;]
+la_macaza_station_id</code></pre>
+
+
+<pre><code>[1] 5599</code></pre>
+
+
+
+<p>We also need starting and ending dates which we can set to the respective starting and ending dates in the provided sales data:</p>
+
+
+
+<pre class="r"><code>weather_data &lt;- ec_climate_data(la_macaza_station_id, timeframe = &quot;daily&quot;, start = &quot;2013-12-02&quot;, end = &quot;2018-02-28&quot;)</code></pre>
+
+
+
+<p>We can now save the data in the appropriate formats, for example, in the native R format and in CSV if you plan to open the data in Excel:</p>
+
+
+
+<pre class="r"><code>save(weather_data, file = &quot;weather_data.RData&quot;)
+write.csv(weather_data, file = &quot;weather_data.csv&quot;, row.names = FALSE)</code></pre>
+
+
+
+
+
+<div>LS0tDQp0aXRsZTogIkFjY2Vzc2luZyBnb3Zlcm5tZW50IHdlYXRoZXIgZGF0YSBpbiBDYW5hZGEiDQpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sNCi0tLQ0KDQpUaGUgd2VhdGhlciBkYXRhIGZvciBhbnkgd2VhdGhlciBzdGF0aW9uIGluIENhbmFkYSBjYW4gYmUgYWNjZXNzZWQgbWFudWFsbHkgZnJvbSBodHRwOi8vY2xpbWF0ZS53ZWF0aGVyLmdjLmNhL2hpc3RvcmljYWxfZGF0YS9zZWFyY2hfaGlzdG9yaWNfZGF0YV9lLmh0bWwNCg0KSG93ZXZlciwgYXV0b21hdGlvbiBvZiB0aGUgZGF0YSBkb3dubG9hZCBjYW4gc2FtZSBsb3RzIG9mIHRpbWUuIEZvcnR1bmF0ZWx5LCBhcHByb3ByaWF0ZSBBUEkgaGFzIGFscmVhZHkgYmVlbiBidWlsdCBhbmQgaXQgaXMgaGlnaGx5IHJlY29tbWVuZGVkIHRvIHVzZSBpdC4gSW4gUiwgd2UgbmVlZCB0byBpbnN0YWxsIHRoZSAicmNsaW1hdGVjYSIgcGFja2FnZSB0aGF0IGNhbiBwdWxsIHRoZSBkYXRhIGRpcmVjdGx5IGZyb20gdGhlIHdlYnNpdGU6DQpgYGB7cn0NCmluc3RhbGwucGFja2FnZXMoInJjbGltYXRlY2EiKQ0KYGBgDQoNCllvdSBzaG91bGQgb25seSBydW4gdGhlIGFib3ZlIGNlbGwgb25jZS4gQ29tbWVudCBpdCBvdXQgYWZ0ZXIgdGhlIHBhY2thZ2UgaXMgaW5zdGFsbGVkIChwdXQgIiMiIGNoYXJhY3RlciBiZWZvcmUgdGhlIGluc3RhbGwucGFja2FnZXMoKSBjb21tYW5kKS4NCg0KT25jZSB0aGUgcGFja2FnZSBpcyBpbnN0YWxsZWQsIHdlIGxvYWQgaXQgaW4gdGhlIHJlZ3VsYXIgd2F5Og0KYGBge3J9DQpsaWJyYXJ5KHJjbGltYXRlY2EpDQpgYGANCg0KT25jZSB0aGUgcGFja2FnZSBpcyBsb2FkZWQsIHdlIGNhbiBsb29rIHVwIGluZm9ybWF0aW9uIG9uIHZhcmlvdXMgd2VhdGhlciBzdGF0aW9ucy4gRm9yIGV4YW1wbGUsICJMQSBNQUNBWkEiIHN0YXRpb24ncyBkZXNjcmlwdGl2ZSBpbmZvIGNhbiBiZSBvYnRhaW5lZCBhcyBmb2xsb3dzOg0KYGBge3J9DQplY19jbGltYXRlX2xvY2F0aW9uc19hbGxbZWNfY2xpbWF0ZV9sb2NhdGlvbnNfYWxsJG5hbWUgPT0gIkxBIE1BQ0FaQSIsXQ0KYGBgDQoNClRvIHF1ZXJ5IHRoZSBkYXRhIHRocm91Z2ggQVBJIHdlIG5lZWQgc3RhdGlvbidzIGNsaW1hdGVfaWQgd2hpY2gsIGluIHRoaXMgY2FzZSwgaXMgNTU5OToNCmBgYHtyfQ0KbGFfbWFjYXphX3N0YXRpb25faWQgPC0gZWNfY2xpbWF0ZV9sb2NhdGlvbnNfYWxsJHN0YXRpb25faWRbZWNfY2xpbWF0ZV9sb2NhdGlvbnNfYWxsJG5hbWUgPT0gIkxBIE1BQ0FaQSJdDQpsYV9tYWNhemFfc3RhdGlvbl9pZA0KYGBgDQoNCldlIGFsc28gbmVlZCBzdGFydGluZyBhbmQgZW5kaW5nIGRhdGVzIHdoaWNoIHdlIGNhbiBzZXQgdG8gdGhlIHJlc3BlY3RpdmUgc3RhcnRpbmcgYW5kIGVuZGluZyBkYXRlcyBpbiB0aGUgcHJvdmlkZWQgc2FsZXMgZGF0YTogDQpgYGB7cn0NCndlYXRoZXJfZGF0YSA8LSBlY19jbGltYXRlX2RhdGEobGFfbWFjYXphX3N0YXRpb25faWQsIHRpbWVmcmFtZSA9ICJkYWlseSIsIHN0YXJ0ID0gIjIwMTMtMTItMDIiLCBlbmQgPSAiMjAxOC0wMi0yOCIpDQpgYGANCg0KV2UgY2FuIG5vdyBzYXZlIHRoZSBkYXRhIGluIHRoZSBhcHByb3ByaWF0ZSBmb3JtYXRzLCBmb3IgZXhhbXBsZSwgaW4gdGhlIG5hdGl2ZSBSIGZvcm1hdCBhbmQgaW4gQ1NWIGlmIHlvdSBwbGFuIHRvIG9wZW4gdGhlIGRhdGEgaW4gRXhjZWw6DQpgYGB7cn0NCnNhdmUod2VhdGhlcl9kYXRhLCBmaWxlID0gIndlYXRoZXJfZGF0YS5SRGF0YSIpDQp3cml0ZS5jc3Yod2VhdGhlcl9kYXRhLCBmaWxlID0gIndlYXRoZXJfZGF0YS5jc3YiLCByb3cubmFtZXMgPSBGQUxTRSkNCmBgYA0KDQo=</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<script type="text/javascript" src="/d2l/common/math/MathML.js?v=10.8.5.12962-126 "></script><script type="text/javascript">document.addEventListener('DOMContentLoaded', function() { D2LMathML.DesktopInit('https://s.brightspace.com/lib/mathjax/2.6.1/MathJax.js?config=MML_HTMLorMML','https://s.brightspace.com/lib/mathjax/2.6.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML'); });</script></body></html>
