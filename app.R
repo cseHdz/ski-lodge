@@ -23,6 +23,9 @@ ui <- dashboardPage(
     title = "Ski Lessons - Mt. Tremblant"
   ),
   dashboardSidebar(
+    sidebarMenu(
+      menuItem("Dashboard", tabName = "dashboard",icon=icon("area-chart"))
+    ),  
     #menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
     selectInput("season", "Season:", 
                 choices = data$season[data$season != 0],
@@ -31,7 +34,9 @@ ui <- dashboardPage(
     numericInput('e_week', 'End week:', 1, 1, 10, 1)
   ),
   dashboardBody(
-
+    fluidRow(
+      valueBoxOutput("ytdLessons")
+    ),
     fluidRow(
       column(width = 5,
              box(
@@ -59,6 +64,22 @@ server <- function(input, output) {
     names(t) <- c('Week_Day', 'avg_lessons')
     t
   })
+  
+  lessons <- reactive({
+    c <- data[data$season == input$season,]
+    ytdLessons <- sum(c$lessons)
+    ytdLessons
+  })
+  
+  output$ytdLessons <- renderValueBox({
+    
+    valueBox(
+      value = toString(lessons()),
+      subtitle = "YTD Lessons",
+      icon = icon("area-chart"),
+      color = "aqua"
+    )
+  })  
   
   output$avg_lessons <- renderPlot({
       barplot(season()$avg_lessons, main="Average Lessons/Day", 
