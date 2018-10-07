@@ -15,43 +15,65 @@ data<- data[data$season != 0,]
 data$DoW <- factor(data$day_week, levels= c("Monday", 
                                          "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
 
-
 # Define UI for application 
-ui <- dashboardPage(
+ui <- 
+  
+  dashboardPage(
   dashboardHeader(
     # Application title
-    title = "Ski Lessons - Mt. Tremblant"
+    title = "Skiing Lessons"
   ),
   dashboardSidebar(
-    sidebarMenu(
-      menuItem("Dashboard", tabName = "dashboard",icon=icon("area-chart"))
-    ),  
-    #menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
     selectInput("season", "Season:", 
                 choices = data$season[data$season != 0],
                 selected = data$season[data$season == 0]),
-    numericInput('s_week', 'Start week:', 1, 1, 10, 1),
-    numericInput('e_week', 'End week:', 1, 1, 10, 1)
+    selectInput("view", "Dashboard View:", 
+                choices = c('Day of the Week', 'by Week', 'Total'),
+                selected = 'Total'),
+    sidebarMenu(
+      menuItem("Profit Analysis", tabName = "profit",icon=icon("usd")),
+      menuItem("Capacity Management", tabName = "capacity",icon=icon("users")),
+      menuItem("Scenario Builder", tabName = "scenario",icon=icon("area-chart"))
+    ),  
+    column(width = 4,
+      style='padding:10px',
+      align = 'center',
+      tableOutput("metrics1"),
+      tableOutput("metrics2")
+    )
   ),
   dashboardBody(
     fluidRow(
-      valueBoxOutput("ytdLessons"),
-      valueBoxOutput("ytdProfit")
+      valueBoxOutput("kpi1"),
+      valueBoxOutput("kpi2"),
+      valueBoxOutput("kpi3")
     ),
     fluidRow(
-      column(width = 5,
+      column(width = 6,
              box(
                title = "Average Lessons Per Day", solidHeader = TRUE, width = NULL, status = "primary",
-               plotOutput("avg_lessons"),
-               tags$head(tags$style("#avg_lessons{height:30vh !important;}"))
-               ),
+               plotOutput("chart1"),
+               tags$head(tags$style("#chart1{height:25vh !important;}"))
+             )),
+      column(width = 6,
              box(
                title = "Revenue per Day", solidHeader = TRUE, width = NULL, status = "primary",
-               plotOutput("revenue"),
-               tags$head(tags$style("#revenue{height:30vh !important;}"))
-             )
-      )
-    )
+               plotOutput("chart2"),
+               tags$head(tags$style("#chart2{height:25vh !important;}"))
+             ))),
+      fluidRow(
+        column(width = 6,
+               box(
+                 title = "Average Lessons Per Day", solidHeader = TRUE, width = NULL, status = "primary",
+                 plotOutput("chart3"),
+                 tags$head(tags$style("#chart3{height:25vh !important;}"))
+               )),
+        column(width = 6,
+               box(
+                 title = "Revenue per Day", solidHeader = TRUE, width = NULL, status = "primary",
+                 plotOutput("chart4"),
+                 tags$head(tags$style("#chart4{height:25vh !important;}"))
+               )))
   )
   
 )
@@ -72,7 +94,7 @@ server <- function(input, output) {
     ytdLessons
   })
   
-  output$ytdLessons <- renderValueBox({
+  output$kpi1 <- renderValueBox({
     
     valueBox(
       value = toString(lessons()),
@@ -82,7 +104,7 @@ server <- function(input, output) {
     )
   })  
   
-  output$ytdProfit <- renderValueBox({
+  output$kpi2 <- renderValueBox({
     
     valueBox(
       value = paste("$", formatC(lessons()*200, format="d", big.mark=",")),
@@ -92,14 +114,46 @@ server <- function(input, output) {
     )
   })  
   
-  output$avg_lessons <- renderPlot({
+  output$kpi3 <- renderValueBox({
+    
+    valueBox(
+      value = paste("$", formatC(lessons()*200, format="d", big.mark=",")),
+      subtitle = "YTD Profit",
+      icon = icon("usd"),
+      color = "red"
+    )
+  })
+  
+  output$chart1 <- renderPlot({
       barplot(season()$avg_lessons, main="Average Lessons/Day", 
               names.arg = season()$Week_Day, col = "blue")
    })
   
-  output$revenue <- renderPlot({
+  output$chart2 <- renderPlot({
     barplot(season()$avg_lessons * 200, main="Revenue by Day", 
             names.arg = season()$Week_Day, col = "green")
+  })
+  
+  output$chart3 <- renderPlot({
+    barplot(season()$avg_lessons, main="Average Lessons/Day", 
+            names.arg = season()$Week_Day, col = "blue")
+  })
+  
+  output$chart4 <- renderPlot({
+    barplot(season()$avg_lessons * 200, main="Revenue by Day", 
+            names.arg = season()$Week_Day, col = "green")
+  })
+  
+  output$metrics1 <- renderTable({
+    t[0:3,]
+  })
+  
+  output$metrics2 <- renderTable({
+    t[0:3,]
+  })
+  
+  output$metrics3 <- renderTable({
+    t[0:3,]
   })
 }
 
