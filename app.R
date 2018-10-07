@@ -145,15 +145,15 @@ server <- function(input, output) {
   })
   
   output$metrics1 <- renderTable({
-    t[0:3,]
+    season()[0:3,]
   })
   
   output$metrics2 <- renderTable({
-    t[0:3,]
+    season()[0:3,]
   })
   
   output$metrics3 <- renderTable({
-    t[0:3,]
+    season()[0:3,]
   })
 }
 
