@@ -28,11 +28,12 @@ ui <-
                 choices = data$season[data$season != 0],
                 selected = data$season[data$season == 0]),
     selectInput("view", "Dashboard View:", 
-                choices = c('Day of the Week', 'by Week', 'Total'),
-                selected = 'Total'),
+                choices = c('This Season', 'by Month', 'by Week','by Weekday'),
+                selected = 'This Season'),
     sidebarMenu(
       menuItem("Profit Analysis", tabName = "profit",icon=icon("usd")),
       menuItem("Capacity Management", tabName = "capacity",icon=icon("users")),
+      menuItem("Weather Assessment", tabName = "scenario",icon=icon("snowflake-o")),
       menuItem("Scenario Builder", tabName = "scenario",icon=icon("area-chart"))
     ),  
     column(width = 4,
@@ -80,6 +81,15 @@ ui <-
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+  
+  profit <- reactive({
+    c <- data[data$season == input$season,]
+    
+    
+    t <-aggregate(c$lessons, by=list(c$DoW), FUN=mean)
+    names(t) <- c('Week_Day', 'avg_lessons')
+    t
+  })
   
   season <- reactive({
     c <- data[data$season == input$season,]
