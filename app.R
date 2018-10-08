@@ -4,16 +4,13 @@
 library(shiny)
 library(googlesheets)
 library (shinydashboard)
+library(lubridate)
+library(data.table)
 
 # Import data
 gs_data <- gs_key("1-17_HfRFg6guIf3lDs-Lsa6zGmOhKRU5AkNQvUcWnNc", lookup = FALSE)
-data <- gs_read(gs_data)
-
-# Modify Data
-data$day_week <- weekdays(as.Date(data$date))
-data<- data[data$season != 0,]
-data$DoW <- factor(data$day_week, levels= c("Monday", 
-                                         "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+summary <- gs_read(gs_data, ws = "summary")
+sales_data <- gs_read(gs_data, ws = "sales_data")
 
 # Define UI for application 
 ui <- 
@@ -24,147 +21,218 @@ ui <-
     title = "Skiing Lessons"
   ),
   dashboardSidebar(
+    # Season Selector
     selectInput("season", "Season:", 
-                choices = data$season[data$season != 0],
-                selected = data$season[data$season == 0]),
+                choices = summary$season[summary$season != 0],
+                selected = summary$season[summary$season == 0]),
+    
+    # Dashboard View Selector
     selectInput("view", "Dashboard View:", 
-                choices = c('This Season', 'by Month', 'by Week','by Weekday'),
+                choices = c('This Season', 'by Month','by Weekday'),
                 selected = 'This Season'),
     sidebarMenu(
+      
+      # Tabs
       menuItem("Profit Analysis", tabName = "profit",icon=icon("usd")),
       menuItem("Capacity Management", tabName = "capacity",icon=icon("users")),
-      menuItem("Weather Assessment", tabName = "scenario",icon=icon("snowflake-o")),
+      menuItem("Weather Assessment", tabName = "weather",icon=icon("snowflake-o")),
       menuItem("Scenario Builder", tabName = "scenario",icon=icon("area-chart"))
     ),  
-    column(width = 4,
-      style='padding:10px',
-      align = 'center',
-      tableOutput("metrics1"),
-      tableOutput("metrics2")
-    )
+    
+    # Summary Metrics
+    column(width = 5,style='padding:10px',align = 'center',
+           tableOutput("metrics1"))
+           #tableOutput("metrics2"))
   ),
   dashboardBody(
-    fluidRow(
-      valueBoxOutput("kpi1"),
-      valueBoxOutput("kpi2"),
-      valueBoxOutput("kpi3")
-    ),
-    fluidRow(
-      column(width = 6,
-             box(
-               title = "Average Lessons Per Day", solidHeader = TRUE, width = NULL, status = "primary",
-               plotOutput("chart1"),
-               tags$head(tags$style("#chart1{height:25vh !important;}"))
-             )),
-      column(width = 6,
-             box(
-               title = "Revenue per Day", solidHeader = TRUE, width = NULL, status = "primary",
-               plotOutput("chart2"),
-               tags$head(tags$style("#chart2{height:25vh !important;}"))
-             ))),
-      fluidRow(
-        column(width = 6,
-               box(
-                 title = "Average Lessons Per Day", solidHeader = TRUE, width = NULL, status = "primary",
-                 plotOutput("chart3"),
-                 tags$head(tags$style("#chart3{height:25vh !important;}"))
-               )),
-        column(width = 6,
-               box(
-                 title = "Revenue per Day", solidHeader = TRUE, width = NULL, status = "primary",
-                 plotOutput("chart4"),
-                 tags$head(tags$style("#chart4{height:25vh !important;}"))
-               )))
+    tabItems(
+      
+      # Individual sections corresponding to the tabs in the tab bar
+      
+      tabItem("profit",
+              #KPI Row
+              fluidRow(
+                valueBoxOutput("total_profit"),
+                valueBoxOutput("avg_profit_lesson"),
+                valueBoxOutput("avg_profit_instructor")
+              ),
+              
+              #Charts Row
+              fluidRow(
+                column(width = 6,
+                       box(title = "Profit Trends", solidHeader = TRUE, width = NULL, status = "primary",
+                           plotOutput("profit_chart"),tags$head(tags$style("#profit_chart{height:25vh !important;}")))),
+                column(width = 6,
+                       box(title = "Profit per Lesson", solidHeader = TRUE, width = NULL, status = "primary",
+                         plotOutput("profit_l_chart"),tags$head(tags$style("#profit_l_chart{height:25vh !important;}"))))),
+              fluidRow(
+                column(width = 6,
+                       box(title = "Revenue Analysis", solidHeader = TRUE, width = NULL, status = "primary",
+                         plotOutput("revenue_chart"),tags$head(tags$style("#revenue_chart{height:25vh !important;}")))),
+                column(width = 6,
+                       box(title = "Cost Analysis", solidHeader = TRUE, width = NULL, status = "primary",
+                         plotOutput("cost_chart"),tags$head(tags$style("#cost_chart{height:25vh !important;}"))))
+                )
+      ),
+      tabItem("capacity",
+              #KPI Row
+              fluidRow(
+                valueBoxOutput("lessons_instructor"),
+                valueBoxOutput("days_overstaffed"),
+                valueBoxOutput("avg_lessons_day")
+              ),
+              
+              #Charts Row
+              fluidRow(
+                column(width = 6,
+                       box(title = "Lesson Trends", solidHeader = TRUE, width = NULL, status = "primary",
+                           plotOutput("lessons_chart"),tags$head(tags$style("#lessons_chart{height:25vh !important;}")))),
+                column(width = 6,
+                       box(title = "Lessons per Instructor", solidHeader = TRUE, width = NULL, status = "primary",
+                           plotOutput("lessons_i_chart"),tags$head(tags$style("#lessons_i_chart{height:25vh !important;}"))))),
+              fluidRow(
+                column(width = 6,
+                       box(title = "Overstaffed Ratio", solidHeader = TRUE, width = NULL, status = "primary",
+                           plotOutput("overstaffed_chart"),tags$head(tags$style("#overstaffed_chart{height:25vh !important;}")))),
+                column(width = 6,
+                       box(title = "Lessons Distribution", solidHeader = TRUE, width = NULL, status = "primary",
+                           plotOutput("lessons_d_chart"),tags$head(tags$style("#lessons_d_chart{height:25vh !important;}"))))
+              )
+      ),
+      tabItem("weather"),
+      tabItem("scenario")
+    )
   )
-  
 )
 
-# Define server logic required to draw a histogram
+# Define server logic to render outputs
 server <- function(input, output) {
   
-  profit <- reactive({
-    c <- data[data$season == input$season,]
+  # Reactive Data to Season & View
+  grouping <- reactive ({
+    c <- summary %>%
+      filter(season == input$season)
     
+    if(input$view == 'This Season'){ g <- c$season
+    }else if(input$view == 'by Month'){ g <- c$month
+    }else{g <- c$DoW}
+    g
+  })
+  
+  season_info <- reactive({
+    c <- summary %>%
+      filter(season == input$season)
     
-    t <-aggregate(c$lessons, by=list(c$DoW), FUN=mean)
-    names(t) <- c('Week_Day', 'avg_lessons')
-    t
-  })
-  
-  season <- reactive({
-    c <- data[data$season == input$season,]
-    t <-aggregate(c$lessons, by=list(c$DoW), FUN=mean)
-    names(t) <- c('Week_Day', 'avg_lessons')
-    t
-  })
-  
-  lessons <- reactive({
-    c <- data[data$season == input$season,]
-    ytdLessons <- sum(c$lessons)
-    ytdLessons
-  })
-  
-  output$kpi1 <- renderValueBox({
+    k <- sales_data %>%
+      filter(season == input$season)
     
-    valueBox(
-      value = toString(lessons()),
-      subtitle = "YTD Lessons",
-      icon = icon("area-chart"),
-      color = "aqua"
-    )
-  })  
-  
-  output$kpi2 <- renderValueBox({
+    k <- k %>%
+      group_by(season) %>%
+      summarise(season_start = min(date),
+                season_end = max(date))
     
-    valueBox(
-      value = paste("$", formatC(lessons()*200, format="d", big.mark=",")),
-      subtitle = "YTD Profit",
-      icon = icon("usd"),
-      color = "green"
-    )
-  })  
-  
-  output$kpi3 <- renderValueBox({
+    if(max(c$promotion) == 1){
+      k$promotion = 'Yes'
+    }else{
+      k$promotion = 'No'
+    }
     
-    valueBox(
-      value = paste("$", formatC(lessons()*200, format="d", big.mark=",")),
-      subtitle = "YTD Profit",
-      icon = icon("usd"),
-      color = "red"
-    )
+    k
   })
   
-  output$chart1 <- renderPlot({
-      barplot(season()$avg_lessons, main="Average Lessons/Day", 
-              names.arg = season()$Week_Day, col = "blue")
-   })
-  
-  output$chart2 <- renderPlot({
-    barplot(season()$avg_lessons * 200, main="Revenue by Day", 
-            names.arg = season()$Week_Day, col = "green")
+  summ_data <- reactive({
+    # Extract Metrics for Profit
+    c <- summary %>%
+      filter(season == input$season)
+    
+    # 'This Season', 'by Month', 'by Week', 'by Weekday'
+    group <- grouping()
+
+    c <- c %>%
+      group_by(!!group) %>%
+      summarise(total_cost = sum(total_cost), 
+                n_cost = sum(n_cost), 
+                p_cost = sum(p_cost),
+                n_retCost = sum(n_retCost),
+                p_retCost = sum(p_retCost),
+                total_revenue = sum(total_revenue), 
+                n_rev = sum(n_rev), 
+                p_rev = sum(p_rev),
+                profit = sum(profit), 
+                total_inst = sum(total_inst), 
+                n_inst = sum(n_inst), 
+                p_inst = sum(p_inst), 
+                lessons = sum(lessons),
+                days_open = sum(days_open),
+                days_season = sum(days_season),
+                days_ostaffed = sum(days_ostaffed))
+    c
   })
   
-  output$chart3 <- renderPlot({
-    barplot(season()$avg_lessons, main="Average Lessons/Day", 
-            names.arg = season()$Week_Day, col = "blue")
-  })
+  # -----------------------------------  Profit Tab ----------------------------------
+  # ----------------------------------- Profit KPIs ----------------------------------
+  output$total_profit <- renderValueBox({
+    valueBox(value = paste("$", format(summ_data()$profit, format="d", big.mark=",")),
+             subtitle = "Total Profit",icon = icon("usd"),color = "green")})  
   
-  output$chart4 <- renderPlot({
-    barplot(season()$avg_lessons * 200, main="Revenue by Day", 
-            names.arg = season()$Week_Day, col = "green")
-  })
+  output$avg_profit_lesson <- renderValueBox({
+    valueBox(value = paste("$", format(summ_data()$profit/summ_data()$lessons, 
+                                        format="d", big.mark=",")),
+             subtitle = "Avg. Profit/Lesson",icon = icon("ticket"),color = "aqua")})
   
+  output$avg_profit_instructor <- renderValueBox({
+    valueBox(value = paste("$", format(summ_data()$profit/summ_data()$total_inst,
+                                        format="d", big.mark=",")),
+             subtitle = "Avg. Profit/Staff",icon = icon("street-view"),color = "purple")})  
+  
+  # ----------------------------------- Profit Charts ----------------------------------
+  output$profit_chart<- renderPlot({
+    barplot(summ_data()$profit,main="Profit", col = "blue")})
+  
+  output$profit_l_chart <- renderPlot({
+    barplot(summ_data()$profit/summ_data()$lessons, main="Profit per Lesson", col = "green")})
+  
+  output$revenue_chart <- renderPlot({
+    barplot(summ_data()$total_revenue,main="Revenue", col = "blue")})
+  
+  output$cost_chart <- renderPlot({
+    barplot(summ_data()$total_cost,main="Expenses", col = "green")})
+  
+  
+  # -----------------------------------  Capacity Tab ----------------------------------
+  # ----------------------------------- Cpacity KPIs ----------------------------------
+  output$lessons_instructor <- renderValueBox({
+    valueBox(value = paste(toString(summ_data()$lessons/summ_data()$total_inst), '%'),
+             subtitle = "Lessons/Instructor",icon = icon("graduation-cap"),color = "green")})  
+  
+  output$days_overstaffed <- renderValueBox({
+    valueBox(value = paste(toString(round(summ_data()$days_ostaffed/summ_data()$days_open*100,0)), '%'),
+             subtitle = "% Days Overstaffed",icon = icon("user-plus"),color = "aqua")})
+  
+  output$avg_lessons_day <- renderValueBox({
+    valueBox(value = summ_data()$lessons/summ_data()$days_open,
+             subtitle = "Lessons per Day",icon = icon("street-view"),color = "purple")})  
+  
+  # ----------------------------------- Capacity Charts ----------------------------------
+  output$lessons_chart<- renderPlot({
+    barplot(summ_data()$lessons,main="Lessons", col = "blue")})
+  
+  output$lessons_i_chart <- renderPlot({
+    barplot(summ_data()$lessons/summ_data()$total_inst, main="Profit per Lesson", col = "green")})
+  
+  output$overstaffed_chart <- renderPlot({
+    barplot(summ_data()$days_ostaffed/summ_data()$days_open, main="Revenue", col = "blue")})
+  
+  output$lessons_d_chart <- renderPlot({
+    hist(summ_data()$lessons, main="Disttribution of Lessons", xlab="# Lesson")})
+
+  # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
-    season()[0:3,]
-  })
-  
-  output$metrics2 <- renderTable({
-    season()[0:3,]
-  })
-  
-  output$metrics3 <- renderTable({
-    season()[0:3,]
-  })
+    n <- colnames(season_info())
+    x <- t(season_info())
+    colnames(x) <- c('Season Info')
+    x
+  }, options = list(scrollX = TRUE))
 }
 
 # Run the application 
