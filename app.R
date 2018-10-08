@@ -23,7 +23,8 @@ ui <- (
       # Season Selector
       selectInput("season", "Season:", 
                   choices = summary$season[summary$season != 0],
-                  selected = summary$season[summary$season == 0]),
+                  selected = summary$season[summary$season == '1'],
+                  multiple = TRUE),
       
       # Dashboard View Selector
       selectInput("view", "Dashboard View:", 
@@ -97,7 +98,31 @@ ui <- (
                              plotOutput("lessons_d_chart"),tags$head(tags$style("#lessons_d_chart{height:25vh !important;}"))))
                 )
         ),
-        tabItem("weather"),
+        tabItem("weather",
+                #KPI Row
+                fluidRow(
+                  valueBoxOutput("days_open"),
+                  valueBoxOutput("days_snow"),
+                  valueBoxOutput("corr_snow_lessons")
+                ),
+                
+                #Charts Row
+                fluidRow(
+                  column(width = 6,
+                         box(title = "% Open Days", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("open_days_chart"),tags$head(tags$style("#open_days_chart{height:25vh !important;}")))),
+                  column(width = 6,
+                         box(title = "Lessons to Avg. Temperature", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("lessons_t_chart"),tags$head(tags$style("#lessons_t_chart{height:25vh !important;}"))))),
+                fluidRow(
+                  column(width = 6,
+                         box(title = "% Snow Days Open", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("snow_chart"),tags$head(tags$style("#snow_chart{height:25vh !important;}")))),
+                  column(width = 6,
+                         box(title = "Lessons to Snow cm", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("lessons_s_chart"),tags$head(tags$style("#lessons_s_chart{height:25vh !important;}"))))
+                )
+        ),
         tabItem("scenario")
       )
     )
@@ -164,14 +189,18 @@ server <- function(input, output) {
                 lessons = sum(lessons),
                 days_open = sum(days_open),
                 days_season = sum(days_season),
-                days_ostaffed = sum(days_ostaffed))
+                days_snow = sum(days_snow),
+                days_ostaffed = sum(days_ostaffed),
+                total_snow_cm = sum(total_snow_cm),
+                snow_on_grnd_cm = sum (snow_on_grnd_cm),
+                mean_temp_c = sum(mean_temp_c_factor)/sum(days_season)/24)
     c
   })
   
   # -----------------------------------  Profit Tab ----------------------------------
   # ----------------------------------- Profit KPIs ----------------------------------
   output$total_profit <- renderValueBox({
-    valueBox(value = paste("$", format(summ_data()$profit, format="d", big.mark=",")),
+    valueBox(value = paste("$", format(round(summ_data()$profit,0), format="d", big.mark=",")),
              subtitle = "Total Profit",icon = icon("usd"),color = "green")})  
   
   output$avg_profit_lesson <- renderValueBox({
@@ -199,7 +228,7 @@ server <- function(input, output) {
   
   
   # -----------------------------------  Capacity Tab ----------------------------------
-  # ----------------------------------- Cpacity KPIs ----------------------------------
+  # ----------------------------------- Capacity KPIs ----------------------------------
   output$lessons_instructor <- renderValueBox({
     valueBox(value = toString(round(mean(summ_data()$lessons/summ_data()$total_inst),2)),
              subtitle = "Lessons/Instructor",icon = icon("graduation-cap"),color = "green")})  
@@ -210,7 +239,7 @@ server <- function(input, output) {
   
   output$avg_lessons_day <- renderValueBox({
     valueBox(value = round(summ_data()$lessons/summ_data()$days_open,1),
-             subtitle = "Lessons per Day",icon = icon("street-view"),color = "purple")})  
+             subtitle = "Lessons per Open Day",icon = icon("child"),color = "purple")})  
   
   # ----------------------------------- Capacity Charts ----------------------------------
   output$lessons_chart<- renderPlot({
@@ -223,8 +252,42 @@ server <- function(input, output) {
     barplot(summ_data()$days_ostaffed/summ_data()$days_open, main="Revenue", col = "blue")})
   
   output$lessons_d_chart <- renderPlot({
-    hist(summ_data()$lessons, main="Disttribution of Lessons", xlab="# Lesson")})
+    hist(summ_data()$lessons, main="Distribution of Lessons", xlab="# Lesson")})
 
+  # -----------------------------------  Weather Tab ----------------------------------
+  # ----------------------------------- Weather KPIs ----------------------------------
+  
+  output$days_open <- renderValueBox({
+    valueBox(value = toString(round(mean(summ_data()$days_open),2)),
+             subtitle = "# Days Open",icon = icon("calendar-check-o"),color = "green")})  
+  
+  output$days_snow <- renderValueBox({
+    valueBox(value = toString(round(mean(summ_data()$days_snow),2)),
+             subtitle = "# Days with 15cm + snow ",icon = icon("snowflake-o"),color = "aqua")})
+  
+  output$corr_snow_lessons <- renderValueBox({
+    valueBox(value = paste(toString(round(cor(summ_data()$lessons,summ_data()$snow_on_grnd_cm)*100,0)), '%'),
+             subtitle = "% Lessons driven by Snow cm",icon = icon("percent"),color = "purple")})  
+  
+  # ----------------------------------- Weather Charts ----------------------------------
+  output$open_days_chart<- renderPlot({
+    barplot(summ_data()$days_open,main="Lessons", col = "blue")})
+  
+  output$lessons_t_chart <- renderPlot({
+    plot(summ_data()$lessons, summ_data()$mean_temp_c, main="Avg. Temperature to Lessons", 
+         xlab="Lessons", ylab="Avg. Temperature", pch=19)
+    if (length(summ_data()$lessons) > 1){
+      abline(lm(summ_data()$mean_temp_c ~ summ_data()$lessons), col="red") # regression line (y~x) 
+    }
+  })
+  
+  output$snow_chart <- renderPlot({
+    plot(summ_data()$days_snow/summ_data()$days_open, main="% Snow Days Open", col = "blue")})
+  
+  output$lessons_s_chart <- renderPlot({
+    hist(summ_data()$snow_on_grnd_cm, main="Distribution of Snow", xlab="Snow on Ground")})
+  
+  
   # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
     n <- colnames(season_info())
