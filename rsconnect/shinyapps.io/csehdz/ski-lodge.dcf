@@ -5,6 +5,6 @@ account: csehdz
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 497081
-bundleId: 1627533
+bundleId: 1628666
 url: https://csehdz.shinyapps.io/ski-lodge/
-when: 1538889133.06043
+when: 1538963428.36311
