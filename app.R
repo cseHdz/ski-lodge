@@ -5,6 +5,7 @@ library(shiny)
 library(googlesheets)
 library (shinydashboard)
 library(data.table)
+
 suppressMessages(library(dplyr))
 
 # Import data
@@ -20,16 +21,15 @@ ui <- (
       title = "Skiing Lessons"
     ),
     dashboardSidebar(
-      # Season Selector
-      selectInput("season", "Season:", 
-                  choices = summary$season[summary$season != 0],
-                  selected = summary$season[summary$season == 0]),
+      
+      uiOutput("season_control"),
       
       # Dashboard View Selector
       selectInput("view", "Dashboard View:", 
                   choices = c('by Season', 'by Month','by Weekday'),
                   selected = 'by Season'),
-      sidebarMenu(
+      
+      sidebarMenu(id = 'tab',
         
         # Tabs
         menuItem("Profit Analysis", tabName = "profit",icon=icon("usd")),
@@ -38,10 +38,7 @@ ui <- (
         menuItem("Scenario Builder", tabName = "scenario",icon=icon("area-chart"))
       ),  
       
-      # Summary Metrics
-      column(width = 5,style='padding:10px',align = 'center',
-             tableOutput("metrics1"))
-             #tableOutput("metrics2"))
+      uiOutput("controls")
     ),
     dashboardBody(
       tabItems(
@@ -166,6 +163,27 @@ server <- function(input, output) {
     k
   })
   
+  model_data <- reactive({
+    
+  })
+  
+  control_data <- reactive({
+    if(input$tab != 'scenario'){
+      c <- summary %>%
+        filter(season == input$season)
+    }else{
+      min_temp <- min(summary$mean_temp_c_factor/summary$days_season/2)
+      max_temp <- max(summary$mean_temp_c_factor/summary$days_season/2)
+      mean_temp <- mean(summary$mean_temp_c_factor/summary$days_season/2)
+      min_snow <- min(summary$snow_on_grnd_cm/summary$days_season)
+      max_snow <- max(summary$snow_on_grnd_cm/summary$days_season)
+      mean_snow <- mean(summary$snow_on_grnd_cm/summary$days_season)
+      z <- list(min_temp = min_temp, max_tem = max_temp, mean_temp = mean_temp,
+                min_snow = min_snow, max_snow = max_snow, mean_snow = mean_snow)
+      z
+    }
+  })
+  
   summ_data <- reactive({
     # Extract Metrics for Profit
     c <- summary %>%
@@ -234,7 +252,7 @@ server <- function(input, output) {
   # -----------------------------------  Capacity Tab ----------------------------------
   # ----------------------------------- Capacity KPIs ----------------------------------
   output$lessons_instructor <- renderValueBox({
-    metric <- round(mean(summ_data()$lessons/summ_data()$total_inst),0)
+    metric <- round(mean(summ_data()$lessons/summ_data()$total_inst),2)
     valueBox(value = toString(metric),subtitle = "Lessons/Instructor",
              icon = icon("graduation-cap"),color = "green")})  
   
@@ -244,7 +262,7 @@ server <- function(input, output) {
              icon = icon("user-plus"),color = "aqua")})
   
   output$avg_lessons_day <- renderValueBox({
-    metric <- round(mean(summ_data()$lessons/summ_data()$days_open),0)
+    metric <- round(mean(summ_data()$lessons/summ_data()$days_open),2)
     valueBox(value = metric, subtitle = "Lessons per Open Day",icon = icon("child"),color = "purple")})  
   
   # ----------------------------------- Capacity Charts ----------------------------------
@@ -298,11 +316,55 @@ server <- function(input, output) {
   
   # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
-    n <- colnames(season_info())
-    x <- t(season_info())
-    colnames(x) <- c('Season Info')
-    x
+    if (input$tab != 'scenario'){
+      start_date <- season_info()$start_date
+      end_date <- season_info()$end_date
+      promotion <- season_info()$promotion
+      x <- data.frame(season_info()[2:4])
+      y <- t(x)
+      rownames(y) <-c('Season Start', 'Season End', 'Promotion')
+      colnames(y) <- c('Season Info')
+      y
+    }
+  },  rownames = TRUE)
+  
+  
+  # ----------------------------------- Dynamic Sidebar ----------------------------------
+  # ---------------------------------- Scenario Controls ---------------------------------
+  output$controls <- renderUI({
+    if (input$tab != 'scenario'){
+      column(width = 5,style='padding:10px',align = 'center',
+             tableOutput("metrics1"))
+    }else{
+      list(sliderInput("exp_temp", "Avg. Temperature (in °C):",
+                  min = control_data()$min_temp, max = 10,
+                  value = control_data()$mean_temp, step = 2.5),
+      
+      sliderInput("exp_snow", "Avg. Snow (in cm):",
+                  min = control_data()$min_snow, max =  100,
+                  value = control_data()$mean_snow, step = 2.5),
+      
+      dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date(),
+                     min = Sys.Date(), max = Sys.Date() + 365,
+                     format = "yyyy-mm-dd", startview = "day", weekstart = 1,
+                     separator = " to ", language = "en", width = NULL),
+      
+      selectInput("promo", "Promotion?", 
+                  choices = c('Yes', 'No'),
+                  selected = 'No'))
+    }
   })
+  
+  # -------------------------------- Descriptive Controls -------------------------------
+  output$season_control <- renderUI({
+    # Season Selector
+    if (input$tab != 'scenario'){
+      selectInput("season", "Season:", 
+                  choices = summary$season[summary$season != 0],
+                  selected = summary$season[summary$season == 0])
+    }
+  })
+  
 }
 
 # Run the application 
