@@ -1,0 +1,277 @@
+---
+title: "Ski Data Preparation"
+output: html_notebook
+---
+
+Import Sales Data
+```{r}
+library(readr)
+sales_data <- read_csv("~/Documents/School/Masters/MMAi Queens/Semester 1/MMAI863/Assignments/A1/R App/ski-lodge/data/sales_data.csv")
+```
+
+Googlesheets will be used for persistent storgae
+```{r}
+library(googlesheets)
+suppressMessages(library(dplyr))
+```
+
+Prepare sheet details
+
+```{r}
+gap <- gs_key("1-17_HfRFg6guIf3lDs-Lsa6zGmOhKRU5AkNQvUcWnNc", lookup = FALSE, visibility = "private")
+```
+
+Adding Season Information
+```{r}
+
+sales_data$year <- strtoi(format(sales_data$date, "%Y"))
+sales_data$month <- strtoi(format(sales_data$date, "%m"))
+sales_data$yrmonth <- strtoi(format(sales_data$date, "%Y%m"))
+
+yrmonth <- unique(sales_data$yrmonth)
+season_end <- (unique(sales_data$year) + 1) *100 +5 
+
+sales_data$season <- 0
+
+for (i in 1:nrow(sales_data)){
+  for (j in 1:length(season_end)){
+    if (sales_data$yrmonth[i] < season_end[j] && sales_data$season[i] == 0){
+      sales_data$season[i] <- j
+    }
+  }
+}
+
+```
+
+Add Preliminary sales data
+```{r}
+ gs_ws_new(gap, 'sales_data', input = sales_data, trim = TRUE)
+```
+
+Prepare Data
+```{r}
+d <- gs_read(gap, ws = "sales_weather_data")
+d$day_week <- weekdays(as.Date(d$date))
+d<- d[d$season != 0,]
+d$DoW <- factor(d$day_week, levels= c("Monday", 
+    "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+```
+
+Add Summary Metrics - Profit & Days
+```{r}
+d$n_rev <- 0
+d$p_rev <- 0
+d$n_retCost <- 0
+d$p_retCost <- 0
+d$n_cost <- 0
+d$p_cost <- 0
+
+d$n_inst <- 0
+d$p_inst <- 0
+d$days_open <- 0
+d$days_season <- 0
+d$days_ostaffed <- 0
+d$days_snow <- 0
+d$snow_on_grnd_cm[is.na(d$snow_on_grnd_cm)] <- mean(d$snow_on_grnd_cm, na.rm = TRUE)
+
+d$n_rev[d$promotion == 0] <- d$lessons[d$promotion == 0] * 549 
+d$p_rev[d$promotion == 1] <- d$lessons[d$promotion == 1] * 499
+d$n_retCost[d$promotion == 0] <- (20 - d$lessons[d$promotion == 0]) * 100
+d$p_retCost[d$promotion == 1] <- (36 - d$lessons[d$promotion == 1]) * 100
+d$n_cost[d$promotion == 0] <- d$lessons[d$promotion == 0] * 549/2
+d$p_cost[d$promotion == 1] <- d$lessons[d$promotion == 1] * 499/2
+
+d$n_inst[d$promotion == 0] <- 20
+d$p_inst[d$promotion == 1] <- 36
+d$days_open[d$lessons > 0] <- 1
+d$days_season[d$season > 0] <- 1
+
+d$total_cost <- (d$n_cost + d$p_cost + d$n_retCost + d$p_retCost) 
+d$total_revenue <- (d$n_rev + d$p_rev)
+d$profit <- d$total_revenue - d$total_cost
+d$total_inst <- d$n_inst + d$p_inst
+d$days_ostaffed [d$total_inst > d$lessons] <- 1
+d$days_snow [d$snow_on_grnd_cm > 15] <- 1
+d$mean_temp_c_factor <- 2 * d$mean_temp_c
+
+```
+
+Create summary
+```{r}
+k <- d %>%
+  group_by(season, DoW, month, year, promotion) %>%
+  summarise(total_cost = sum(total_cost), 
+            n_cost = sum(n_cost), 
+            p_cost = sum(p_cost),
+            n_retCost = sum(n_retCost),
+            p_retCost = sum(p_retCost),
+            total_revenue = sum(total_revenue), 
+            n_rev = sum(n_rev), 
+            p_rev = sum(p_rev),
+            profit = sum(profit), 
+            total_inst = sum(total_inst), 
+            n_inst = sum(n_inst), 
+            p_inst = sum(p_inst), 
+            lessons = sum(lessons),
+            days_open = sum(days_open),
+            days_season = sum(days_season, na.rm = TRUE),
+            days_snow = sum(days_snow, na.rm=TRUE),
+            days_ostaffed = sum(days_ostaffed),
+            total_snow_cm = sum(total_snow_cm, na.rm=TRUE),
+            snow_on_grnd_cm = sum (snow_on_grnd_cm, na.rm=TRUE),
+            mean_temp_c_factor = sum(mean_temp_c_factor, na.rm=TRUE)
+  )
+
+```
+
+Upload new sheet
+```{r}
+gs_ws_new(gap, 'summary', input = k, trim = TRUE)
+```
+Prepare data for modelling
+```{r}
+model_data<- d %>%
+  group_by(season, DoW, month, year, promotion) %>%
+  summarise(lessons = sum(lessons),
+            mean_temp_c_factor = sum(mean_temp_c_factor),
+            snow_on_grnd_cm = sum(snow_on_grnd_cm),
+            total_snow_cm = sum(total_snow_cm),
+            days_season = sum(days_season)
+)
+```
+
+```{r}
+library(stats)
+
+m_temp <- mean(model_data$mean_temp_c_factor/ model_data$days_season, na.rm = TRUE)
+s_temp <- sd(model_data$mean_temp_c_factor/ model_data$days_season, na.rm = TRUE)
+n_temp <- length(model_data$mean_temp_c_factor)
+m_snow <- mean(model_data$snow_on_grnd_cm/ model_data$days_season, na.rm = TRUE)
+s_snow <- sd(model_data$snow_on_grnd_cm/ model_data$days_season, na.rm = TRUE)
+n_snow <- length(model_data$snow_on_grnd_cm)
+
+```
+
+Assess the distribution of Snow on the ground and fitness of normal function
+```{r}
+h <- hist(model_data$snow_on_grnd_cm/model_data$days_season, breaks = 13)
+xhist<-c(min(h$breaks),h$breaks)
+yhist<-c(0,h$density,0)
+x.norm<-rnorm(n=n_snow,m=m_snow,sd=s_snow)
+xfit<-seq(min(x.norm),max(x.norm),length=50)
+yfit<-dnorm(xfit,mean=mean(x.norm),sd=sd(x.norm))
+plot(xhist,yhist,type='s',ylim=c(0,max(yhist,yfit)), main='Avg. Snow on Ground Normal Fit'
+          , xlab = 'Snow in cm', ylab = 'Probability')
+lines(xfit,yfit, col='red')
+
+```
+
+```{r}
+shapiro.test(model_data$snow_grnd/model_data$days_season)
+```
+
+Assess the distribution of Snow on the ground and fitness of normal function
+```{r}
+h <- hist(model_data$mean_temp_c_factor/model_data$days_season, breaks = 13)
+xhist<-c(min(h$breaks),h$breaks)
+yhist<-c(0,h$density,0)
+x.norm<-rnorm(n=n_temp,m=m_temp,sd=s_temp)
+xfit<-seq(min(x.norm),max(x.norm),length=50)
+yfit<-dnorm(xfit,mean=mean(x.norm),sd=sd(x.norm))
+plot(xhist,yhist,type='s',ylim=c(0,max(yhist,yfit)), main='Avg. Temperature Normal Fit'
+     , xlab = 'Temperature in °C', ylab = 'Probability')
+lines(xfit,yfit, col='red')
+
+```
+
+```{r}
+hist(model_data$lessons, main="Distribution of Lessons", xlab="# Lessons")
+```
+
+
+```{r}
+model <- lm(lessons ~ snow_on_grnd_cm + mean_temp_c_factor + DoW + month + promotion + days_season, data = model_data)
+
+```
+
+```{r}
+summary(model)
+```
+Prepare parameters sheet
+```{r}
+library(broom)
+g<-cbind(t(data.frame(model$coefficients)),
+         data.frame(m_snow, m_temp, s_snow, s_temp))
+
+gs_ws_new(gap, 'model_parameters', input = g, trim = TRUE)
+```
+
+
+Clear memory
+```{r}
+rm(list=ls(all=TRUE))
+```
+
+
+```{r}
+rsconnect::deployApp('~/Documents/School/Masters/MMAi Queens/Semester 1/MMAI863/Assignments/A1/R App/ski-lodge/')
+```
+
+Model Backup
+```{r}
+ model <- reactive({
+    start_Date <- input$season_length[1]
+    end_Date <- input$season_length[2]
+    
+    # Filter days of interest
+    x <- model_dates[model_dates$Date >= start_Date,]
+    x <- x[x$Date <= end_Date,]
+    x$count <- 1
+    
+    # Summarize all concepts
+    y<- x %>%
+      group_by(DoW, Month, Year, Day_Num) %>%
+      summarise(count = sum(count))
+    size <- nrow(y)
+    
+    # Calculate n = size values from normal dist
+    y$snow_avg <- c(rnorm(size, p$m_snow, p$s_snow)) 
+    y$temp_avg <- c(rnorm(size, p$m_temp, p$s_temp))
+    
+    # Calculate total factors
+    y$snow <- y$snow_avg * y$count       
+    y$temp <- y$temp_avg * y$count 
+    
+    # Assign factors to week vector
+    week <- c(0, p$DoWTuesday, p$DoWWednesday, p$DoWThursday, 
+              p$DoWFriday, p$DoWSaturday, p$DoWSunday)
+    
+    # Calculate lessons
+    y$f_int <- as.numeric(p['(Intercept)'])
+    y$f_days <- p$days_season * y$Day_Num
+    y$f_snow <- p$snow_on_grnd_cm * y$snow
+    y$f_temp <- p$mean_temp_c_factor * y$temp
+    y$f_month <- p$month * y$Month
+    y$f_DoW <- week[y$Day_Num]
+    y$lessons <- y$f_int + y$f_days + y$f_snow + y$f_temp +y$f_month +y$f_DoW
+    inst <- ceiling(max(y$lessons/y$Day_Num))
+    y$profit <- 549/2 * y$lessons - 100*(inst * y$Day_Num - y$lessons)
+    y$inst <- inst
+
+    # 'This Season', 'by Month', 'by Week', 'by Weekday'
+    group <- grouping()
+    
+    y <- y %>%
+      group_by(!!group) %>%
+      summarize_all(mean)
+    y
+  })
+```
+
+```{r}
+sample(1:10, 1)
+
+```
+
+
+

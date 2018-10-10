@@ -195,10 +195,16 @@ server <- function(input, output) {
     x <- model_dates[model_dates$Date >= start_Date,]
     x <- x[x$Date <= end_Date,]
     x$count <- 1
+    x$promotion <- 0
+    
+    if (input$promo == 'Yes'){
+      promo_start = sample(1: nrow(x)-15, 1)
+      x[promo_start:promo_start +14,]$promotion <- 1
+    }
     
     # Summarize all concepts
     y<- x %>%
-      group_by(DoW, Month, Year, Day_Num) %>%
+      group_by(DoW, Month, Year, Day_Num, promotion) %>%
       summarise(count = sum(count))
     size <- nrow(y)
     
@@ -216,6 +222,7 @@ server <- function(input, output) {
     
     # Calculate lessons
     y$f_int <- as.numeric(p['(Intercept)'])
+    y$f_int <- p$promotion * y$promotion
     y$f_days <- p$days_season * y$Day_Num
     y$f_snow <- p$snow_on_grnd_cm * y$snow
     y$f_temp <- p$mean_temp_c_factor * y$temp
@@ -524,22 +531,21 @@ server <- function(input, output) {
       column(width = 5,style='padding:10px',align = 'center',
              tableOutput("metrics1"))
     }else{
-      list(selectInput("promo", "Promotion?", 
-                       choices = c('Yes', 'No'),
-                       selected = 'No'),
+      list(
+       dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date()+30,
+                      min = Sys.Date(), max = Sys.Date() + 365,
+                      format = "yyyy-mm-dd", startview = "day", weekstart = 1,
+                      separator = " to ", language = "en", width = NULL),
+       selectInput("promo", "Promotion?", 
+                   choices = c('Yes', 'No'),
+                   selected = 'No'),
         sliderInput("exp_temp", "Avg. Temperature (in °C):",
                   min = control_data()$min_temp, max = 10,
                   value = control_data()$mean_temp, step = 2.5),
       
       sliderInput("exp_snow", "Avg. Snow (in cm):",
                   min = control_data()$min_snow, max =  100,
-                  value = control_data()$mean_snow, step = 2.5),
-      
-      dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date()+30,
-                     min = Sys.Date(), max = Sys.Date() + 365,
-                     format = "yyyy-mm-dd", startview = "day", weekstart = 1,
-                     separator = " to ", language = "en", width = NULL))
-      
+                  value = control_data()$mean_snow, step = 2.5))
      }
   })
   
