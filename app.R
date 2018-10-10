@@ -5,6 +5,7 @@ library(shiny)
 library(googlesheets)
 library (shinydashboard)
 library(data.table)
+library(ggplot2)
 
 suppressMessages(library(dplyr))
 
@@ -105,7 +106,7 @@ ui <- (
                 #Charts Row
                 fluidRow(
                   column(width = 6,
-                         box(title = "% Open Days", solidHeader = TRUE, width = NULL, status = "primary",
+                         box(title = "# Open Days", solidHeader = TRUE, width = NULL, status = "primary",
                              plotOutput("open_days_chart"),tags$head(tags$style("#open_days_chart{height:25vh !important;}")))),
                   column(width = 6,
                          box(title = "Lessons to Avg. Temperature", solidHeader = TRUE, width = NULL, status = "primary",
@@ -157,7 +158,8 @@ server <- function(input, output) {
     
     if(input$view == 'by Season'){ g <- c$season
     }else if(input$view == 'by Month'){ g <- c$month
-    }else{g <- c$DoW}
+    }else{g <- factor(c$DoW, levels= c("Monday", "Tuesday", "Wednesday", 
+                                       "Thursday", "Friday", "Saturday", "Sunday"))}
     g
   })
   
@@ -220,12 +222,13 @@ server <- function(input, output) {
     y$inst <- inst * y$Day_Num
     y$season <- 1
     
-    if(input$view == 'by Season'){grp <- y$season
-    }else if(input$view == 'by Month'){ grp <- y$Month
-    }else{grp <- y$DoW}
+    if(input$view == 'by Season'){ y$group <- y$season
+    }else if(input$view == 'by Month'){ y$group <- y$Month
+    }else{y$group <- factor(y$DoW, levels= c("Monday", "Tuesday", "Wednesday", 
+                                             "Thursday", "Friday", "Saturday", "Sunday"))}
     
     y <- y %>%
-      group_by(!!grp) %>%
+      group_by(group) %>%
       summarize(profit = sum(profit),
                 lessons = sum(lessons),
                 inst = sum(inst),
@@ -257,10 +260,10 @@ server <- function(input, output) {
       filter(season == input$season)
     
     # 'This Season', 'by Month', 'by Week', 'by Weekday'
-    group <- grouping()
+    c$group <- grouping()
 
     c <- c %>%
-      group_by(!!group) %>%
+      group_by(group) %>%
       summarise(total_cost = sum(total_cost), 
                 n_cost = sum(n_cost), 
                 p_cost = sum(p_cost),
@@ -364,7 +367,11 @@ server <- function(input, output) {
   
   # ----------------------------------- Weather Charts ----------------------------------
   output$open_days_chart<- renderPlot({
-    barplot(summ_data()$days_open,main="Lessons", col = "blue")})
+    ggplot(data=summ_data(), aes(x = factor(group) ,y = days_open))+
+      geom_bar(stat = 'identity', width=0.7, fill="forestgreen")+
+      theme_minimal() +
+      ylab('') +
+      xlab('')})
   
   output$lessons_t_chart <- renderPlot({
     plot(summ_data()$lessons, summ_data()$mean_temp_c, main="Avg. Temperature to Lessons", 
@@ -375,7 +382,12 @@ server <- function(input, output) {
   })
   
   output$snow_chart <- renderPlot({
-    hist(summ_data()$snow_on_grnd_cm, main="Distribution of Snow", xlab="Snow on Ground")})
+    ggplot(data=summ_data(), aes(x = factor(group) ,y = snow_on_grnd_cm/days_season))+
+      geom_bar(stat = 'identity', width=0.7, fill="steelblue")+
+      theme_minimal() +
+      ylab('Avg. Snow on Ground') +
+      xlab('')
+    })
   
   output$temp_chart <- renderPlot({
     hist(summ_data()$mean_temp_c, main="Distribution of Temperature", xlab="Temperature")})
@@ -401,13 +413,28 @@ server <- function(input, output) {
   # ----------------------------------- Scenario Charts ----------------------------------
   
   output$s_profit_chart<- renderPlot({
-    barplot(model()$profit,main="Profit", col = "blue")})
+    ggplot(data=model(), aes(x = group, y = profit))+
+      geom_bar(stat = 'identity', fill = "steelblue")+
+      xlab('') +
+      ylab('Profit') +
+      theme_minimal()
+  })
   
   output$s_lessons_chart<- renderPlot({
-    barplot(model()$lessons,main="Lessons", col = "blue")})
-  
+    ggplot(data=model(), aes(x = group, y = lessons))+
+      geom_bar(stat = 'identity', fill = 'forestgreen')+
+      xlab('') +
+      ylab('Lessons') +
+      theme_minimal()})
   output$s_lessons_i_chart<- renderPlot({
-    barplot(model()$lessons,main="Lessons", col = "blue")})
+    
+    ggplot(data = model()) + 
+    geom_bar(aes(x = factor(group), y = inst/days_season), stat = 'identity', alpha = 0.5, fill = 'purple4') +
+    geom_bar(aes(x = factor(group), y = lessons/days_season), stat = 'identity', alpha = 0.8, fill = "forestgreen") +
+    xlab('') +
+    ylab('Days') +
+    theme_minimal()
+    })
   
   # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
@@ -438,7 +465,7 @@ server <- function(input, output) {
       dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date()+30,
                      min = Sys.Date(), max = Sys.Date() + 365,
                      format = "yyyy-mm-dd", startview = "day", weekstart = 1,
-                     separator = " to ", language = "en", width = NULL),
+                     separator = " to ", language = "en", width = NULL))
       
     #   selectInput("promo", "Promotion?", 
     #               choices = c('Yes', 'No'),
