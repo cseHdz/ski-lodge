@@ -181,8 +181,8 @@ server <- function(input, output) {
   })
   
   model <- reactive({
-    start_Date <- as.Date("2018-10-22")
-    end_Date <- as.Date("2019-02-22")
+    start_Date <- as.Date(format(input$season_length[1]))
+    end_Date <- as.Date(format(input$season_length[2]))
     
     # Filter days of interest
     x <- model_dates[model_dates$Date >= start_Date,]
@@ -217,7 +217,7 @@ server <- function(input, output) {
     y$lessons <- y$f_int + y$f_days + y$f_snow + y$f_temp +y$f_month +y$f_DoW
     inst <- ceiling(max(y$lessons/y$Day_Num))
     y$profit <- 549/2 * y$lessons - 100*(inst * y$Day_Num - y$lessons)
-    y$inst <- inst
+    y$inst <- inst * y$Day_Num
     y$season <- 1
     
     if(input$view == 'by Season'){grp <- y$season
@@ -228,7 +228,8 @@ server <- function(input, output) {
       group_by(!!grp) %>%
       summarize(profit = sum(profit),
                 lessons = sum(lessons),
-                inst = sum(inst))
+                inst = sum(inst),
+                days_season = sum(Day_Num))
   
     y
   })
@@ -393,7 +394,7 @@ server <- function(input, output) {
              icon = icon("graduation-cap"),color = "green")})  
   
   output$s_inst <- renderValueBox({
-    metric = round(mean(model()$inst),0)
+    metric = round(mean(model()$inst/model()$days_season),0)
     valueBox(value = metric, subtitle = "# Instructors",
              icon = icon("street-view"),color = "green")})  
   
@@ -434,15 +435,15 @@ server <- function(input, output) {
                   min = control_data()$min_snow, max =  100,
                   value = control_data()$mean_snow, step = 2.5),
       
-      dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date(),
+      dateRangeInput("season_length", "Season Start:", start = Sys.Date(), end = Sys.Date()+30,
                      min = Sys.Date(), max = Sys.Date() + 365,
                      format = "yyyy-mm-dd", startview = "day", weekstart = 1,
                      separator = " to ", language = "en", width = NULL),
       
-      selectInput("promo", "Promotion?", 
-                  choices = c('Yes', 'No'),
-                  selected = 'No'))
-    }
+    #   selectInput("promo", "Promotion?", 
+    #               choices = c('Yes', 'No'),
+    #               selected = 'No'))
+     }
   })
   
   # -------------------------------- Descriptive Controls -------------------------------
