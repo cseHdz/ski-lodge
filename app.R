@@ -84,7 +84,7 @@ ui <- (
                          box(title = "Lesson Trends", solidHeader = TRUE, width = NULL, status = "primary",
                              plotOutput("lessons_chart"),tags$head(tags$style("#lessons_chart{height:25vh !important;}")))),
                   column(width = 6,
-                         box(title = "Lessons per Instructor", solidHeader = TRUE, width = NULL, status = "primary",
+                         box(title = "Lessons to Instructor Ratio", solidHeader = TRUE, width = NULL, status = "primary",
                              plotOutput("lessons_i_chart"),tags$head(tags$style("#lessons_i_chart{height:25vh !important;}"))))),
                 fluidRow(
                   column(width = 6,
@@ -109,7 +109,7 @@ ui <- (
                          box(title = "# Open Days", solidHeader = TRUE, width = NULL, status = "primary",
                              plotOutput("open_days_chart"),tags$head(tags$style("#open_days_chart{height:25vh !important;}")))),
                   column(width = 6,
-                         box(title = "Lessons to Avg. Temperature", solidHeader = TRUE, width = NULL, status = "primary",
+                         box(title = "Lessons to Temperature Trends", solidHeader = TRUE, width = NULL, status = "primary",
                              plotOutput("lessons_t_chart"),tags$head(tags$style("#lessons_t_chart{height:25vh !important;}"))))),
                 fluidRow(
                   column(width = 6,
@@ -139,8 +139,9 @@ ui <- (
                              plotOutput("s_lessons_chart"),tags$head(tags$style("#s_lessons_chart{height:25vh !important;}"))))),
                 fluidRow(
                   column(width = 6,
-                         box(title = "Lessons to Instructors", solidHeader = TRUE, width = NULL, status = "primary",
-                             plotOutput("s_lessons_i_chart"),tags$head(tags$style("#s_lessons_i_chart{height:25vh !important;}"))))
+                         box(title = "Lessons to Instructors Ratio", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("s_lessons_i_chart"),tags$head(tags$style("#s_lessons_i_chart{height:25vh !important;}")))),
+                  column(width =6,verbatimTextOutput("recommendation"))
                 )
               )
       )
@@ -157,7 +158,11 @@ server <- function(input, output) {
       filter(season == input$season)
     
     if(input$view == 'by Season'){ g <- c$season
-    }else if(input$view == 'by Month'){ g <- c$month
+    }else if(input$view == 'by Month'){ g <- factor(month.abb[c$month], 
+                                                    levels =  c("Jan","Feb","Mar",
+                                                                "Apr","May","Jun",
+                                                                "Jul","Aug","Sep",
+                                                                "Oct","Nov","Dec"))
     }else{g <- factor(c$DoW, levels= c("Monday", "Tuesday", "Wednesday", 
                                        "Thursday", "Friday", "Saturday", "Sunday"))}
     g
@@ -223,8 +228,12 @@ server <- function(input, output) {
     y$season <- 1
     
     if(input$view == 'by Season'){ y$group <- y$season
-    }else if(input$view == 'by Month'){ y$group <- y$Month
-    }else{y$group <- factor(y$DoW, levels= c("Monday", "Tuesday", "Wednesday", 
+    }else if(input$view == 'by Month'){ y$group <- factor(month.abb[y$Month], 
+                                                          levels =  c("Jan","Feb","Mar",
+                                                                      "Apr","May","Jun",
+                                                                      "Jul","Aug","Sep",
+                                                                      "Oct","Nov","Dec"))
+    }else{y$group <- factor(y$DoW, levels=  c("Monday", "Tuesday", "Wednesday", 
                                              "Thursday", "Friday", "Saturday", "Sunday"))}
     
     y <- y %>%
@@ -307,16 +316,41 @@ server <- function(input, output) {
   
   # ----------------------------------- Profit Charts ----------------------------------
   output$profit_chart<- renderPlot({
-    barplot(summ_data()$profit,main="Profit", col = "blue")})
+    #barplot(summ_data()$profit,main="Profit", col = "blue")})
+    ggplot(data=summ_data(), aes(x = factor(group), y = profit))+
+      geom_bar(stat = 'identity', fill = 'steelblue')+
+      xlab('') +
+      ylab('dollars') +
+      theme_minimal()
+  })
   
   output$profit_l_chart <- renderPlot({
-    barplot(summ_data()$profit/summ_data()$lessons, main="Profit per Lesson", col = "green")})
+    #barplot(summ_data()$profit/summ_data()$lessons, main="Profit per Lesson", col = "green")})
+    ggplot(data=summ_data(), aes(x = factor(group), y = profit/lessons))+
+      geom_bar(stat = 'identity', fill = 'lightsteelblue')+
+      xlab('') +
+      ylab('dollars') +
+      theme_minimal()
+  })
   
   output$revenue_chart <- renderPlot({
-    barplot(summ_data()$total_revenue,main="Revenue", col = "blue")})
+    #barplot(summ_data()$total_revenue,main="Revenue", col = "blue")})
+    ggplot(data=summ_data(), aes(x = factor(group), y = total_revenue))+
+      geom_bar(stat = 'identity', fill = 'forestgreen')+
+      xlab('') +
+      ylab('dollars') +
+      theme_minimal()
+  })
+  
   
   output$cost_chart <- renderPlot({
-    barplot(summ_data()$total_cost,main="Expenses", col = "green")})
+    #barplot(summ_data()$total_cost,main="Expenses", col = "green")})
+    ggplot(data=summ_data(), aes(x = factor(group), y = total_cost))+
+      geom_bar(stat = 'identity', fill = 'red4')+
+      xlab('') +
+      ylab('dollars') +
+      theme_minimal()
+  })
   
   # -----------------------------------  Capacity Tab ----------------------------------
   # ----------------------------------- Capacity KPIs ----------------------------------
@@ -336,16 +370,43 @@ server <- function(input, output) {
   
   # ----------------------------------- Capacity Charts ----------------------------------
   output$lessons_chart<- renderPlot({
-    barplot(summ_data()$lessons,main="Lessons", col = "blue")})
+    #barplot(summ_data()$lessons,main="Lessons", col = "blue")})
+    ggplot(data=summ_data(), aes(x = factor(group), y = lessons))+
+      geom_bar(stat = 'identity', fill = 'forestgreen', width=0.7)+
+      xlab('') +
+      ylab('# of lessons') +
+      theme_minimal()
+    })
   
   output$lessons_i_chart <- renderPlot({
-    barplot(summ_data()$lessons/summ_data()$total_inst, main="Profit per Lesson", col = "green")})
+    ggplot(data = summ_data()) +
+      geom_bar(aes(x = factor(group), y = lessons/total_inst), width=0.7, stat = 'identity', alpha = 0.7, fill = 'purple4') +
+      xlab('') +
+      ylab('%') +
+      theme_minimal()
+    
+    # ggplot(data = summ_data(), aes(lessons, total_inst)) + 
+    #   geom_point() + geom_smooth(method = "lm") +
+    #   theme_minimal() +
+    #   ylab('instructors')
+  })
   
   output$overstaffed_chart <- renderPlot({
-    barplot(summ_data()$days_ostaffed/summ_data()$days_open, main="Revenue", col = "blue")})
+    ggplot(data = summ_data()) + 
+      geom_bar(aes(x = factor(group), y = days_ostaffed/days_open),width=0.7, stat = 'identity', alpha = 0.8, fill = "steelblue") +
+      xlab('') +
+      ylab('%') +
+      theme_minimal()
+  })
   
   output$lessons_d_chart <- renderPlot({
-    hist(summ_data()$lessons, main="Distribution of Lessons", xlab="# Lesson")})
+    #hist(summ_data()$lessons, main="Distribution of Lessons", xlab="# Lesson")
+    ggplot(data=summ_data(), aes(x = factor(group) ,y = lessons))+
+      geom_bar(stat = 'identity', width=0.7, fill="steelblue")+
+      theme_minimal() +
+      ylab('lessons') +
+      xlab('')
+  })
 
   # -----------------------------------  Weather Tab ----------------------------------
   # ----------------------------------- Weather KPIs ----------------------------------
@@ -370,27 +431,34 @@ server <- function(input, output) {
     ggplot(data=summ_data(), aes(x = factor(group) ,y = days_open))+
       geom_bar(stat = 'identity', width=0.7, fill="forestgreen")+
       theme_minimal() +
-      ylab('') +
-      xlab('')})
+      ylab('# of days') +
+      xlab('')
+    })
   
   output$lessons_t_chart <- renderPlot({
-    plot(summ_data()$lessons, summ_data()$mean_temp_c, main="Avg. Temperature to Lessons", 
-         xlab="Lessons", ylab="Avg. Temperature", pch=19)
-    if (length(summ_data()$lessons) > 1){
-      abline(lm(summ_data()$mean_temp_c ~ summ_data()$lessons), col="red") # regression line (y~x) 
-    }
+    
+    ggplot(data = summ_data(), aes(lessons, mean_temp_c)) + 
+      geom_point() + geom_smooth(method = "lm") +
+      theme_minimal() +
+      ylab('°C')
+  
   })
   
   output$snow_chart <- renderPlot({
     ggplot(data=summ_data(), aes(x = factor(group) ,y = snow_on_grnd_cm/days_season))+
       geom_bar(stat = 'identity', width=0.7, fill="steelblue")+
       theme_minimal() +
-      ylab('Avg. Snow on Ground') +
+      ylab('cm.') +
       xlab('')
     })
   
   output$temp_chart <- renderPlot({
-    hist(summ_data()$mean_temp_c, main="Distribution of Temperature", xlab="Temperature")})
+    ggplot(data=summ_data(), aes(x = factor(group) , y = mean_temp_c)) +
+      geom_bar(stat = 'identity', width=0.7) +
+      theme_minimal() +
+      ylab('°C') +
+      xlab('')
+  })
   
   # ----------------------------------- Scenario Tab ----------------------------------
   # ----------------------------------- Scenario KPIs ---------------------------------
@@ -413,28 +481,36 @@ server <- function(input, output) {
   # ----------------------------------- Scenario Charts ----------------------------------
   
   output$s_profit_chart<- renderPlot({
-    ggplot(data=model(), aes(x = group, y = profit))+
-      geom_bar(stat = 'identity', fill = "steelblue")+
+    ggplot(data=model(), aes(x = factor(group), y = profit))+
+      geom_bar(stat = 'identity', fill = "steelblue", width=0.7)+
       xlab('') +
-      ylab('Profit') +
+      ylab('$') +
       theme_minimal()
   })
   
   output$s_lessons_chart<- renderPlot({
-    ggplot(data=model(), aes(x = group, y = lessons))+
-      geom_bar(stat = 'identity', fill = 'forestgreen')+
+    ggplot(data=model(), aes(x = factor(group), y = lessons))+
+      geom_bar(stat = 'identity', fill = 'forestgreen', width=0.7)+
       xlab('') +
-      ylab('Lessons') +
+      ylab('# of lessons') +
       theme_minimal()})
+  
   output$s_lessons_i_chart<- renderPlot({
-    
     ggplot(data = model()) + 
-    geom_bar(aes(x = factor(group), y = inst/days_season), stat = 'identity', alpha = 0.5, fill = 'purple4') +
-    geom_bar(aes(x = factor(group), y = lessons/days_season), stat = 'identity', alpha = 0.8, fill = "forestgreen") +
-    xlab('') +
-    ylab('Days') +
-    theme_minimal()
+      geom_bar(aes(x = factor(group), y = lessons/inst), stat = 'identity', width=0.7, alpha = 0.7, fill = 'purple4') +
+      xlab('') +
+      ylab('%') +
+      theme_minimal()
     })
+  
+  output$recommendation <- renderText({ 
+    metric = round(mean(model()$inst/model()$days_season),0)
+    r1 <- paste("The chosen season length is ",sum(model()$days_season)," days.")
+    r2 <- paste("You can expect a profit of $", format(sum(model()$profit), format="d", big.mark=","))
+    r3 <- paste("There will be a total of ", round(sum(model()$lessons),0), "lessons.")
+    r4 <- paste("You should hire ", metric, " instructors.")
+    paste(r1, r2, r3, r4, sep="\n")
+  })
   
   # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
