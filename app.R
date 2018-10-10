@@ -370,7 +370,6 @@ server <- function(input, output) {
   
   # ----------------------------------- Capacity Charts ----------------------------------
   output$lessons_chart<- renderPlot({
-    #barplot(summ_data()$lessons,main="Lessons", col = "blue")})
     ggplot(data=summ_data(), aes(x = factor(group), y = lessons))+
       geom_bar(stat = 'identity', fill = 'forestgreen', width=0.7)+
       xlab('') +
@@ -384,11 +383,6 @@ server <- function(input, output) {
       xlab('') +
       ylab('%') +
       theme_minimal()
-    
-    # ggplot(data = summ_data(), aes(lessons, total_inst)) + 
-    #   geom_point() + geom_smooth(method = "lm") +
-    #   theme_minimal() +
-    #   ylab('instructors')
   })
   
   output$overstaffed_chart <- renderPlot({
@@ -530,7 +524,10 @@ server <- function(input, output) {
       column(width = 5,style='padding:10px',align = 'center',
              tableOutput("metrics1"))
     }else{
-      list(sliderInput("exp_temp", "Avg. Temperature (in °C):",
+      list(selectInput("promo", "Promotion?", 
+                       choices = c('Yes', 'No'),
+                       selected = 'No'),
+        sliderInput("exp_temp", "Avg. Temperature (in °C):",
                   min = control_data()$min_temp, max = 10,
                   value = control_data()$mean_temp, step = 2.5),
       
@@ -543,9 +540,6 @@ server <- function(input, output) {
                      format = "yyyy-mm-dd", startview = "day", weekstart = 1,
                      separator = " to ", language = "en", width = NULL))
       
-    #   selectInput("promo", "Promotion?", 
-    #               choices = c('Yes', 'No'),
-    #               selected = 'No'))
      }
   })
   
