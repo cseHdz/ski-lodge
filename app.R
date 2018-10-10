@@ -9,9 +9,11 @@ library(data.table)
 suppressMessages(library(dplyr))
 
 # Import data
-gs_data <- gs_key("1-17_HfRFg6guIf3lDs-Lsa6zGmOhKRU5AkNQvUcWnNc", lookup = FALSE)
+gs_data <- gs_key("1-17_HfRFg6guIf3lDs-Lsa6zGmOhKRU5AkNQvUcWnNc", lookup = FALSE, visibility = "private")
 summary <- gs_read(gs_data, ws = "summary")
 sales_data <- gs_read(gs_data, ws = "sales_data")
+model_dates <- gs_read(gs_data, ws = "model_dates")
+p <- gs_read(gs_data, ws = "model_parameters")
 
 # Define UI for application 
 ui <- (
@@ -30,14 +32,12 @@ ui <- (
                   selected = 'by Season'),
       
       sidebarMenu(id = 'tab',
-        
         # Tabs
         menuItem("Profit Analysis", tabName = "profit",icon=icon("usd")),
         menuItem("Capacity Management", tabName = "capacity",icon=icon("users")),
         menuItem("Weather Assessment", tabName = "weather",icon=icon("snowflake-o")),
         menuItem("Scenario Builder", tabName = "scenario",icon=icon("area-chart"))
       ),  
-      
       uiOutput("controls")
     ),
     dashboardBody(
@@ -119,10 +119,29 @@ ui <- (
                              plotOutput("snow_chart"),tags$head(tags$style("#snow_chart{height:25vh !important;}"))))
                 )
         ),
-        tabItem("scenario"
+        tabItem("scenario",
+                
                 #KPI Row
-              
-        )
+                fluidRow(
+                  valueBoxOutput("s_profit"),
+                  valueBoxOutput("s_lessons"),
+                  valueBoxOutput("s_inst")
+                ),
+                
+                #Charts Row
+                fluidRow(
+                  column(width = 6,
+                         box(title = "Expected Profit", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("s_profit_chart"),tags$head(tags$style("#s_profit_chart{height:25vh !important;}")))),
+                  column(width = 6,
+                         box(title = "Expected Lessons", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("s_lessons_chart"),tags$head(tags$style("#s_lessons_chart{height:25vh !important;}"))))),
+                fluidRow(
+                  column(width = 6,
+                         box(title = "Lessons to Instructors", solidHeader = TRUE, width = NULL, status = "primary",
+                             plotOutput("s_lessons_i_chart"),tags$head(tags$style("#s_lessons_i_chart{height:25vh !important;}"))))
+                )
+              )
       )
     )
   )
@@ -145,26 +164,73 @@ server <- function(input, output) {
   season_info <- reactive({
     c <- summary %>%
       filter(season == input$season)
-    
     k <- sales_data %>%
       filter(season == input$season)
     
     k <- k %>%
       group_by(season) %>%
-      summarise(season_start = min(date),
-                season_end = max(date))
+      summarise(s_start = min(date),
+                s_end = max(date))
     
     if(max(c$promotion) == 1){
       k$promotion = 'Yes'
     }else{
       k$promotion = 'No'
     }
-    
     k
   })
   
-  model_data <- reactive({
+  model <- reactive({
+    start_Date <- as.Date("2018-10-22")
+    end_Date <- as.Date("2019-02-22")
     
+    # Filter days of interest
+    x <- model_dates[model_dates$Date >= start_Date,]
+    x <- x[x$Date <= end_Date,]
+    x$count <- 1
+    
+    # Summarize all concepts
+    y<- x %>%
+      group_by(DoW, Month, Year, Day_Num) %>%
+      summarise(count = sum(count))
+    size <- nrow(y)
+    
+    # Calculate n = size values from normal dist
+    y$snow_avg <- c(rnorm(size, input$exp_snow, p$s_snow)) 
+    y$temp_avg <- c(rnorm(size, input$exp_temp, p$s_temp))
+    
+    # Calculate total factors
+    y$snow <- y$snow_avg * y$count       
+    y$temp <- y$temp_avg * y$count
+    
+    # Assign factors to week vector
+    week <- c(0, p$DoWTuesday, p$DoWWednesday, p$DoWThursday, 
+              p$DoWFriday, p$DoWSaturday, p$DoWSunday)
+    
+    # Calculate lessons
+    y$f_int <- as.numeric(p['(Intercept)'])
+    y$f_days <- p$days_season * y$Day_Num
+    y$f_snow <- p$snow_on_grnd_cm * y$snow
+    y$f_temp <- p$mean_temp_c_factor * y$temp
+    y$f_month <- p$month * y$Month
+    y$f_DoW <- week[y$Day_Num]
+    y$lessons <- y$f_int + y$f_days + y$f_snow + y$f_temp +y$f_month +y$f_DoW
+    inst <- ceiling(max(y$lessons/y$Day_Num))
+    y$profit <- 549/2 * y$lessons - 100*(inst * y$Day_Num - y$lessons)
+    y$inst <- inst
+    y$season <- 1
+    
+    if(input$view == 'by Season'){grp <- y$season
+    }else if(input$view == 'by Month'){ grp <- y$Month
+    }else{grp <- y$DoW}
+    
+    y <- y %>%
+      group_by(!!grp) %>%
+      summarize(profit = sum(profit),
+                lessons = sum(lessons),
+                inst = sum(inst))
+  
+    y
   })
   
   control_data <- reactive({
@@ -248,7 +314,6 @@ server <- function(input, output) {
   output$cost_chart <- renderPlot({
     barplot(summ_data()$total_cost,main="Expenses", col = "green")})
   
-  
   # -----------------------------------  Capacity Tab ----------------------------------
   # ----------------------------------- Capacity KPIs ----------------------------------
   output$lessons_instructor <- renderValueBox({
@@ -314,17 +379,42 @@ server <- function(input, output) {
   output$temp_chart <- renderPlot({
     hist(summ_data()$mean_temp_c, main="Distribution of Temperature", xlab="Temperature")})
   
+  # ----------------------------------- Scenario Tab ----------------------------------
+  # ----------------------------------- Scenario KPIs ---------------------------------
+  
+  output$s_profit <- renderValueBox({
+    metric <- round(mean(model()$profit),0)
+    valueBox(value = paste("$", format(metric, format="d", big.mark=",")),
+             subtitle = "Avg. Profit",icon = icon("usd"),color = "green")})  
+  
+  output$s_lessons<- renderValueBox({
+    metric <- round(mean(model()$lessons/model()$inst),2)
+    valueBox(value = toString(metric),subtitle = "Lessons/Instructor",
+             icon = icon("graduation-cap"),color = "green")})  
+  
+  output$s_inst <- renderValueBox({
+    metric = round(mean(model()$inst),0)
+    valueBox(value = metric, subtitle = "# Instructors",
+             icon = icon("street-view"),color = "green")})  
+  
+  # ----------------------------------- Scenario Charts ----------------------------------
+  
+  output$s_profit_chart<- renderPlot({
+    barplot(model()$profit,main="Profit", col = "blue")})
+  
+  output$s_lessons_chart<- renderPlot({
+    barplot(model()$lessons,main="Lessons", col = "blue")})
+  
+  output$s_lessons_i_chart<- renderPlot({
+    barplot(model()$lessons,main="Lessons", col = "blue")})
+  
   # ----------------------------------- Summary Metrics ----------------------------------
   output$metrics1 <- renderTable({
     if (input$tab != 'scenario'){
-      start_date <- season_info()$start_date
-      end_date <- season_info()$end_date
-      promotion <- season_info()$promotion
-      x <- data.frame(season_info()[2:4])
-      y <- t(x)
-      rownames(y) <-c('Season Start', 'Season End', 'Promotion')
-      colnames(y) <- c('Season Info')
-      y
+      m <- t(data.frame(season_info()[2:4]))
+      rownames(m) <-c('Season Start', 'Season End', 'Promotion')
+      colnames(m) <- c('Season Info')
+      m
     }
   },  rownames = TRUE)
   
