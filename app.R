@@ -230,7 +230,10 @@ server <- function(input, output) {
     y$f_DoW <- week[y$Day_Num]
     y$lessons <- y$f_int + y$f_days + y$f_snow + y$f_temp +y$f_month +y$f_DoW
     inst <- ceiling(max(y$lessons/y$Day_Num))
-    y$profit <- 549/2 * y$lessons - 100*(inst * y$Day_Num - y$lessons)
+    
+    y$profit <- 0
+    y$profit[y$promotion == 0] <- 549/2 * y$lessons[y$promotion == 0] - 100*(inst * y$Day_Num[y$promotion == 0] - y$lessons[y$promotion == 0])
+    y$profit[y$promotion == 1] <- 499/2 * y$lessons [y$promotion == 1]- 100*(inst * y$Day_Num[y$promotion == 1] - y$lessons[y$promotion == 1])
     y$inst <- inst * y$Day_Num
     y$season <- 1
     
