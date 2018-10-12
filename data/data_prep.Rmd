@@ -6,7 +6,7 @@ output: html_notebook
 Import Sales Data
 ```{r}
 library(readr)
-sales_data <- read_csv("~/Documents/School/Masters/MMAi Queens/Semester 1/MMAI863/Assignments/A1/R App/ski-lodge/data/sales_data.csv")
+sales_data <- read_csv("~/data/sales_data.csv")
 ```
 
 Googlesheets will be used for persistent storgae
