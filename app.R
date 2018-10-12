@@ -21,7 +21,11 @@ ui <- (
   dashboardPage(
     dashboardHeader(
       # Application title
-      title = "Skiing Lessons"
+      title = "Skiing Lessons",
+      tags$li(class = "dropdown",
+              tags$a(class = "dropdown", 
+                     href = "https://drive.google.com/open?id=1fU6ocdUTXyv4w-1Rt-4NnBGrQjYFdNFX", 
+                     "Documentation"))
     ),
     dashboardSidebar(
       
@@ -30,7 +34,7 @@ ui <- (
       # Dashboard View Selector
       selectInput("view", "Dashboard View:", 
                   choices = c('by Season', 'by Month','by Weekday'),
-                  selected = 'by Season'),
+                  selected = 'by Month'),
       
       sidebarMenu(id = 'tab',
         # Tabs
