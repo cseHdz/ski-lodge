@@ -196,8 +196,10 @@ server <- function(input, output) {
     end_Date <- as.Date(format(input$season_length[2]))
     
     # Filter days of interest
-    x <- model_dates[model_dates$Date >= start_Date,]
-    x <- x[x$Date <= end_Date,]
+    begin <- which(model_dates$Date == start_Date)
+    end <- which(model_dates$Date == end_Date)
+    
+    x <- model_dates[begin:end,]
     x$count <- 1
     x$promotion <- 0
     
@@ -227,18 +229,18 @@ server <- function(input, output) {
     # Calculate lessons
     y$f_int <- as.numeric(p['(Intercept)'])
     y$f_int <- p$promotion * y$promotion
-    y$f_days <- p$days_season * y$Day_Num
+    y$f_days <- p$days_season * y$count
     y$f_snow <- p$snow_on_grnd_cm * y$snow
     y$f_temp <- p$mean_temp_c_factor * y$temp
     y$f_month <- p$month * y$Month
     y$f_DoW <- week[y$Day_Num]
     y$lessons <- y$f_int + y$f_days + y$f_snow + y$f_temp +y$f_month +y$f_DoW
-    inst <- ceiling(max(y$lessons/y$Day_Num))
+    inst <- ceiling(max(y$lessons/y$count))
     
     y$profit <- 0
-    y$profit[y$promotion == 0] <- 549/2 * y$lessons[y$promotion == 0] - 100*(inst * y$Day_Num[y$promotion == 0] - y$lessons[y$promotion == 0])
-    y$profit[y$promotion == 1] <- 499/2 * y$lessons [y$promotion == 1]- 100*(inst * y$Day_Num[y$promotion == 1] - y$lessons[y$promotion == 1])
-    y$inst <- inst * y$Day_Num
+    y$profit[y$promotion == 0] <- 549/2 * y$lessons[y$promotion == 0] - 100*(inst * y$count[y$promotion == 0] - y$lessons[y$promotion == 0])
+    y$profit[y$promotion == 1] <- 499/2 * y$lessons [y$promotion == 1]- 100*(inst * y$count[y$promotion == 1] - y$lessons[y$promotion == 1])
+    y$inst <- inst * y$count
     y$season <- 1
     
     if(input$view == 'by Season'){ y$group <- y$season
@@ -255,7 +257,7 @@ server <- function(input, output) {
       summarize(profit = sum(profit),
                 lessons = sum(lessons),
                 inst = sum(inst),
-                days_season = sum(Day_Num))
+                days_season = sum(count))
   
     y
   })
