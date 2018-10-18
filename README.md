@@ -10,6 +10,7 @@ This project was created using R Studio.
 
 ## Overview
 This project provides a live visualization into the operations of a hypothetical ski lodge.
+
 The focus is on a description of previous sales and prediction of future sales.
 
 The live visualization can be found [here.](https://csehdz.shinyapps.io/ski-lodge/)
@@ -28,7 +29,7 @@ gs_data <- gs_key("COPY KEY FROM REGULAR SHARE LINK HERE", lookup = FALSE, visib
 ````
 
 
-**__Note: The persistent storage requires the sheet to be shared as [public](https://support.google.com/docs/answer/183965?co=GENIE.Platform%3DDesktop&hl=en).__**
+**_Note: The persistent storage requires the sheet to be shared as [public](https://support.google.com/docs/answer/183965?co=GENIE.Platform%3DDesktop&hl=en)._**
 
 
 
