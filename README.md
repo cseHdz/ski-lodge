@@ -3,7 +3,6 @@
 ## Requirements
 Source Code: Data Preparation on R Markdown, Dashboard on RShiny
 
-
 Libraries: googlesheets, readr, dplyr, ggplot2, shinydashboard
 
 This project was created using R Studio.
@@ -32,4 +31,6 @@ gs_data <- gs_key("COPY KEY FROM REGULAR SHARE LINK HERE", lookup = FALSE, visib
 **_Note: The persistent storage requires the sheet to be shared as [public](https://support.google.com/docs/answer/183965?co=GENIE.Platform%3DDesktop&hl=en)._**
 
 
+## Credits
 
+All fonts are sourced from [FontAwesome v4.7.](https://fontawesome.com/v4.7.0)
